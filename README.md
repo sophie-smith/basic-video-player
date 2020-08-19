@@ -14,7 +14,7 @@ If anyone looks at this, please let me know if you spot any errors. I'm still be
 ## Execution
 To compile the code:
 
-``gcc player.c display.c -o videoplayer -lavformat -lavcodec -lavutil -lm `sdl2-config --cflags --libs` ``
+``make videoplayer ``
 
 To run the video player on a sample video, i.e. video.mov:
 

@@ -18,4 +18,6 @@ int display_init();
 
 void render_frame(AVFrame *frame, AVCodecContext *codec_context, double fps);
 
+void display_destroy();
+
 #endif /* DISPLAY_H */

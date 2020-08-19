@@ -19,39 +19,41 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    // Determine index corresponding to video 
     int video_idx = 0;
     if (get_stream_index(avfc, &video_idx) < 0) {
         printf("Error finding video stream.\n");
-        return -1;
+        goto cleanup_context;
     }
 
+    // Obtain corresponding decoder
     AVCodec *codec = NULL;
     AVCodecContext *codec_context = NULL;
     if (get_decoder(avfc, video_idx, &codec, &codec_context) < 0) {
         printf("Incompatible format for decoding.\n");
-        return -1;
+        goto cleanup_context;
     }
 
+    // Initialize SDL display
     if (display_init(codec_context) < 0) {
         printf("Error initializing SDL display.\n");
-        return -1;
+        goto cleanup_codec_context;
     }
 
-    // TODO: Initialize frame pool and threading
+    // Allocate frame and packets for later use
     AVFrame *frame = av_frame_alloc();
     if (!frame) {
         printf("Unable to allocate video frame.\n");
-        return -1;
+        goto cleanup_codec_context;
     }
-
     AVPacket *packet = av_packet_alloc();
     if (!packet) {
         printf("Unable to allocate space for packet.\n");
-        return -1;
+        goto cleanup_frame;
     }
 
+    // Read and render frames to screen 
     int response = 0;
-
     SDL_Event event;
     while (av_read_frame(avfc, packet) >= 0) {
 
@@ -59,8 +61,7 @@ int main(int argc, char *argv[])
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
-                    // TODO: Add error checking here
-                    return -1;
+                    goto done;
             }
         }
 
@@ -78,10 +79,27 @@ int main(int argc, char *argv[])
         av_packet_unref(packet);
     }
 
+done:
+    display_destroy();
+    av_packet_free(&packet);
+cleanup_frame:
+    av_frame_free(&frame);
+cleanup_codec_context:
+    avcodec_free_context(&codec_context);
+cleanup_context:
+    avformat_close_input(&avfc);
+
     return 0;
 }
 
-// returns the stream index
+/**
+ * @brief Retrieves index corresponding to video stream 
+ * 
+ * @param context Additional format information
+ * @param index Variable to store video stream index
+ * 
+ * @return Negative on error, 0 on success 
+ */
 int get_stream_index(AVFormatContext *context, int *index)
 {
     if (!context || !index) {
@@ -115,7 +133,16 @@ int get_stream_index(AVFormatContext *context, int *index)
     return 0;
 }
 
-// open codec and find decoder for video stream
+/**
+ * @brief Open codec and find decoder for video stream
+ * 
+ * @param context Additional format information
+ * @param index Video stream index
+ * @param codec Store obtained codec
+ * @param codec_context Store additional codec information
+ * 
+ * @return Negative on error, 0 on success
+ */
 int get_decoder(AVFormatContext *context, int index, AVCodec **codec, AVCodecContext **codec_context) 
 {
     if (!codec || !codec_context) {
@@ -151,6 +178,16 @@ int get_decoder(AVFormatContext *context, int index, AVCodec **codec, AVCodecCon
     return 0;
 }
 
+/**
+ * @brief Decodes packet to obtain uncompressed frame
+ * 
+ * @param packet Compressed data
+ * @param context Additional codec information
+ * @param frame Store frame after decompressing and render to frame
+ * @param fps Fps for video stream
+ * 
+ * @return Negative on error, 0 on success
+ */
 int decode_packet(AVPacket *packet, AVCodecContext *context, AVFrame *frame, double fps) 
 {
     // supply raw packet data as input to decoder

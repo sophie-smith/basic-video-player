@@ -1,14 +1,28 @@
 /**
  * @file display.c
- * @brief SDL Video Display
+ * @brief Implements routines relating to SDL video display to render
+ * frames to the screen
  */
 
 #include "display.h"
 
+/**
+ * @brief Representation of frame
+ */
 SDL_Texture *texture;
+
+/**
+ * @brief Contains renderer state
+ */
 SDL_Renderer *renderer;
 
-// Creates SDL renderer and texture to update frames
+/**
+ * @brief Initializes SDL window, renderer and texture for displaying frames
+ * 
+ * @param codec_context Additional data on codec
+ * 
+ * @return Negative on error, 0 on success
+ */
 int display_init(AVCodecContext *codec_context) 
 {
     if (!codec_context) {
@@ -37,6 +51,7 @@ int display_init(AVCodecContext *codec_context)
     }
 
     SDL_GL_SetSwapInterval(1);
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE);
     texture = SDL_CreateTexture(
         renderer, 
@@ -46,15 +61,33 @@ int display_init(AVCodecContext *codec_context)
         codec_context->height
     );
 
-    if (!renderer || !texture) {
-        printf("Error creating renderer and/or texture.\n");
+    if (!renderer) {
+        printf("Error creating renderer.\n");
+        SDL_Quit();
+        return -1;
+    }
+
+    if (!texture) {
+        printf("Error creating texture.\n");
+        SDL_DestroyRenderer(renderer);
+        SDL_Quit();
         return -1;
     }
 
     return 0;
 }
 
-void render_frame(AVFrame *frame, AVCodecContext *codec_context, double fps) {
+/**
+ * @brief Routine to display frame to SDL window
+ * 
+ * @param frame Frame to render
+ * @param codec_context Additional codec information
+ * @param fps Fps for video 
+ * 
+ * @return Negative on error, 0 on success
+ */
+void render_frame(AVFrame *frame, AVCodecContext *codec_context, double fps) 
+{
     if (!frame) return;
 
     // Delay each frame by proper frame rate
@@ -66,6 +99,7 @@ void render_frame(AVFrame *frame, AVCodecContext *codec_context, double fps) {
     rect.w = codec_context->width;
     rect.h = codec_context->height;
 
+    // Update texture with YUV for frame
     SDL_UpdateYUVTexture(
         texture,
         &rect,
@@ -87,4 +121,13 @@ void render_frame(AVFrame *frame, AVCodecContext *codec_context, double fps) {
 
     // Update screen with any rendering performed since previous call
     SDL_RenderPresent(renderer);
+}
+
+/**
+ * @brief Cleanup resources associated with SDL 
+ */
+void display_destroy()
+{
+    SDL_DestroyRenderer(renderer);
+    SDL_Quit();
 }
